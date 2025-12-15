@@ -103,7 +103,17 @@ function pingServer (address) {
  */
 function arpAll (skipNameResolution = false, arpPath) {
   const isWindows = process.platform.includes('win32')
-  const cmd = (skipNameResolution && !isWindows) ? `${arpPath} -an` : `${arpPath} -a`
+  const isLinux = process.platform.includes('linux')
+  
+  let cmd
+  if (isLinux) {
+    cmd = 'ip neigh'
+  } else if (isWindows) {
+    cmd = `${arpPath} -a`
+  } else {
+    cmd = (skipNameResolution) ? `${arpPath} -an` : `${arpPath} -a`
+  }
+  
   return cp.exec(cmd, options).then(parseAll)
 }
 
@@ -144,7 +154,10 @@ function arpOne (address, arpPath) {
     return Promise.reject(new Error('Invalid IP address provided.'))
   }
 
-  return cp.exec(`${arpPath} -n ${address}`, options).then(parseOne)
+  const isLinux = process.platform.includes('linux')
+  const cmd = isLinux ? `ip neigh show ${address}` : `${arpPath} -n ${address}`
+  
+  return cp.exec(cmd, options).then(parseOne)
 }
 
 /**
