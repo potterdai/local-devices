@@ -1,21 +1,34 @@
 /**
- * Parses each row in the arp table into { name, ip, mac } on linux.
+ * Parses each row in the ip neigh table into { name, ip, mac } on linux.
  *
- * partially inspired by https://github.com/goliatone/arpscan/blob/master/lib/arpscanner.js
+ * ip neigh format: <ip> dev <interface> lladdr <mac> <state>
+ * Example: 192.168.1.1 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE
  */
 module.exports = function parseLinux (row, servers, parseOne) {
   var result = {}
 
-  // Ignore unresolved hosts.
-  if (row === '' || row.indexOf('incomplete') >= 0) {
+  // Ignore empty rows and incomplete entries.
+  if (row === '' || row.indexOf('INCOMPLETE') >= 0 || row.indexOf('FAILED') >= 0) {
     return
   }
 
   var chunks = row.split(' ').filter(Boolean)
-  if (parseOne) {
-    result = prepareOne(chunks)
-  } else {
-    result = prepareAll(chunks)
+  
+  // ip neigh format: IP dev INTERFACE lladdr MAC STATE
+  // Find the IP (first element) and MAC (after 'lladdr')
+  var ip = chunks[0]
+  var macIndex = chunks.indexOf('lladdr')
+  
+  if (macIndex === -1 || macIndex + 1 >= chunks.length) {
+    return
+  }
+  
+  var mac = chunks[macIndex + 1]
+  
+  result = {
+    name: '?', // hostname is not provided by ip neigh
+    ip: ip,
+    mac: mac
   }
 
   // Only resolve external ips.
@@ -24,20 +37,4 @@ module.exports = function parseLinux (row, servers, parseOne) {
   }
 
   return result
-}
-
-function prepareOne (chunks) {
-  return {
-    name: '?', // a hostname is not provided on the raspberry pi (linux)
-    ip: chunks[0],
-    mac: chunks[2]
-  }
-}
-
-function prepareAll (chunks) {
-  return {
-    name: chunks[0],
-    ip: chunks[1].match(/\((.*)\)/)[1],
-    mac: chunks[3]
-  }
 }
